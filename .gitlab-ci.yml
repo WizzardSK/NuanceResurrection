@@ -53,6 +53,14 @@ libretro-build-windows-x64:
     - .libretro-windows-cmake-x86_64
     - .core-defs
 
+# Windows 32-bit (i686). The same code path as the 32-bit Linux job - the
+# legacy x86 emitter and the SSSE3 flag it needs - built with MinGW instead of
+# GCC. No asmjit here either: that is the 64-bit JIT.
+libretro-build-windows-i686:
+  extends:
+    - .libretro-windows-cmake-x86
+    - .core-defs
+
 # macOS 64-bit
 libretro-build-osx-x64:
   extends:

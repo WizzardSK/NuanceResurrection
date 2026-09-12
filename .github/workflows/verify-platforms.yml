@@ -1,0 +1,62 @@
+name: verify new libretro targets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [pr-platforms]
+
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Both slices on the Apple Silicon runner: the Intel ones queue for
+          # hours now, and the x86_64 slice cross-compiles the way the buildbot's
+          # osx-cmake template does anyway.
+          - { runner: macos-14, name: "osx-x64", arch: x86_64 }
+          - { runner: macos-14, name: "osx-arm64", arch: arm64 }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with: { submodules: recursive }
+      - run: cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_LIBRETRO=ON -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} -B build
+      - run: cmake --build build --parallel 3
+      - run: file build/nuance_libretro.* && ls -la build/nuance_libretro.*
+
+  linux_i686:
+    name: linux-i686
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with: { submodules: recursive }
+      - run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update -qy
+          sudo apt-get install -yq gcc-multilib g++-multilib libgl1-mesa-dev:i386 libx11-dev:i386 libglx-dev:i386
+      - run: cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_LIBRETRO=ON -DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_SYSTEM_PROCESSOR=i686 -B build
+      - run: cmake --build build --parallel 3
+      - run: file build/nuance_libretro.so
+
+  windows_i686:
+    name: windows-i686 (mingw)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with: { submodules: recursive }
+      - run: |
+          sudo apt-get update -qy
+          sudo apt-get install -yq mingw-w64
+      - run: |
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_LIBRETRO=ON \
+            -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=i686 \
+            -DCMAKE_C_COMPILER=i686-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=i686-w64-mingw32-g++ \
+            -DCMAKE_RC_COMPILER=i686-w64-mingw32-windres \
+            -DCMAKE_FIND_ROOT_PATH=/usr/i686-w64-mingw32 \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -B build
+      - run: cmake --build build --parallel 3
+      - run: file build/nuance_libretro.dll && ls -la build/nuance_libretro.dll
